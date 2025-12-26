@@ -19,7 +19,8 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # Register root endpoint BEFORE Flask-RESTX Api to ensure it takes precedence
-@app.route('/', methods=['GET'])
+# Use unique endpoint name to avoid conflict with Flask-RESTX's "root" endpoint
+@app.route('/', methods=['GET'], endpoint='api_root')
 def root():
     """Root endpoint with API information."""
     return jsonify({
