@@ -18,6 +18,26 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
+# Register root endpoint BEFORE Flask-RESTX Api to ensure it takes precedence
+@app.route('/', methods=['GET'])
+def root():
+    """Root endpoint with API information."""
+    return jsonify({
+        'message': 'Welcome to the Minyan Finder API',
+        'version': '1.0.0',
+        'endpoints': {
+            'health': '/health',
+            'api_docs': '/docs',
+            'broadcasts': {
+                'create': 'POST /broadcasts',
+                'find_nearby': 'GET /broadcasts/nearby',
+                'update': 'PUT /broadcasts/{id}',
+                'delete': 'DELETE /broadcasts/{id}'
+            }
+        },
+        'documentation': '/docs'
+    }), 200
+
 # Configure API
 api = Api(
     app,
@@ -85,28 +105,6 @@ class Health(Resource):
     def get(self):
         """Health check endpoint."""
         return {'status': 'healthy', 'service': 'minyan-finder-api'}, 200
-
-# Root endpoint (registered last to ensure it takes precedence)
-def root():
-    """Root endpoint with API information."""
-    return jsonify({
-        'message': 'Welcome to the Minyan Finder API',
-        'version': '1.0.0',
-        'endpoints': {
-            'health': '/health',
-            'api_docs': '/docs',
-            'broadcasts': {
-                'create': 'POST /broadcasts',
-                'find_nearby': 'GET /broadcasts/nearby',
-                'update': 'PUT /broadcasts/{id}',
-                'delete': 'DELETE /broadcasts/{id}'
-            }
-        },
-        'documentation': '/docs'
-    }), 200
-
-# Register root endpoint using add_url_rule to ensure it works
-app.add_url_rule('/', 'api_root', root, methods=['GET'])
 
 
 @app.errorhandler(404)
