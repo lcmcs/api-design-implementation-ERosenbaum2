@@ -75,30 +75,29 @@ def close_db(error):
         db_session.close()
 
 
+# Root endpoint (using Flask route to avoid Flask-RESTX conflicts)
+@app.route('/', methods=['GET'])
+def root():
+    """Root endpoint with API information."""
+    return jsonify({
+        'message': 'Welcome to the Minyan Finder API',
+        'version': '1.0.0',
+        'endpoints': {
+            'health': '/health',
+            'api_docs': '/docs',
+            'broadcasts': {
+                'create': 'POST /broadcasts',
+                'find_nearby': 'GET /broadcasts/nearby',
+                'update': 'PUT /broadcasts/{id}',
+                'delete': 'DELETE /broadcasts/{id}'
+            }
+        },
+        'documentation': '/docs'
+    }), 200
+
 # Register routes
 if Session:
     register_routes(api, get_db_session)
-
-# Root endpoint
-@api.route('/', methods=['GET'])
-class Root(Resource):
-    def get(self):
-        """Root endpoint with API information."""
-        return {
-            'message': 'Welcome to the Minyan Finder API',
-            'version': '1.0.0',
-            'endpoints': {
-                'health': '/health',
-                'api_docs': '/docs',
-                'broadcasts': {
-                    'create': 'POST /broadcasts',
-                    'find_nearby': 'GET /broadcasts/nearby',
-                    'update': 'PUT /broadcasts/{id}',
-                    'delete': 'DELETE /broadcasts/{id}'
-                }
-            },
-            'documentation': '/docs'
-        }, 200
 
 # Health check endpoint
 @api.route('/health', methods=['GET'])
