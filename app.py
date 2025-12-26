@@ -75,8 +75,18 @@ def close_db(error):
         db_session.close()
 
 
-# Root endpoint (using Flask route to avoid Flask-RESTX conflicts)
-@app.route('/', methods=['GET'], endpoint='api_root')
+# Register routes
+if Session:
+    register_routes(api, get_db_session)
+
+# Health check endpoint
+@api.route('/health', methods=['GET'])
+class Health(Resource):
+    def get(self):
+        """Health check endpoint."""
+        return {'status': 'healthy', 'service': 'minyan-finder-api'}, 200
+
+# Root endpoint (registered last to ensure it takes precedence)
 def root():
     """Root endpoint with API information."""
     return jsonify({
@@ -95,16 +105,8 @@ def root():
         'documentation': '/docs'
     }), 200
 
-# Register routes
-if Session:
-    register_routes(api, get_db_session)
-
-# Health check endpoint
-@api.route('/health', methods=['GET'])
-class Health(Resource):
-    def get(self):
-        """Health check endpoint."""
-        return {'status': 'healthy', 'service': 'minyan-finder-api'}, 200
+# Register root endpoint using add_url_rule to ensure it works
+app.add_url_rule('/', 'api_root', root, methods=['GET'])
 
 
 @app.errorhandler(404)
