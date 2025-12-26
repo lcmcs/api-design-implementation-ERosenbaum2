@@ -1,0 +1,88 @@
+"""
+Main Flask application for the Minyan Finder API.
+"""
+from flask import Flask, jsonify, g
+from flask_restx import Api, Resource
+from flask_cors import CORS
+from models import Base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+from routes import register_routes
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+
+# Initialize Flask app
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
+# Configure API
+api = Api(
+    app,
+    version='1.0.0',
+    title='Minyan Finder API',
+    description='A RESTful API for finding nearby people who need a minyan (prayer group)',
+    doc='/docs'  # Swagger UI endpoint
+)
+
+# Initialize database engine
+database_url = os.getenv('DATABASE_URL')
+if database_url:
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    engine = create_engine(database_url)
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+else:
+    engine = None
+    Session = None
+
+
+def get_db_session():
+    """Get database session for current request."""
+    if 'db_session' not in g:
+        if Session:
+            g.db_session = Session()
+        else:
+            raise ValueError("Database not configured. Please set DATABASE_URL environment variable.")
+    return g.db_session
+
+
+@app.teardown_appcontext
+def close_db(error):
+    """Close database session after request."""
+    db_session = g.pop('db_session', None)
+    if db_session:
+        db_session.close()
+
+
+# Register routes
+if Session:
+    register_routes(api, get_db_session)
+
+# Health check endpoint
+@api.route('/health', methods=['GET'])
+class Health(Resource):
+    def get(self):
+        """Health check endpoint."""
+        return {'status': 'healthy', 'service': 'minyan-finder-api'}, 200
+
+
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors."""
+    return jsonify({'error': 'Endpoint not found'}), 404
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 errors."""
+    return jsonify({'error': 'Internal server error'}), 500
+
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=os.getenv('FLASK_ENV') == 'development')
+
