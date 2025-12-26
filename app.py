@@ -30,12 +30,29 @@ api = Api(
 # Initialize database engine
 database_url = os.getenv('DATABASE_URL')
 if database_url:
-    if database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    engine = create_engine(database_url)
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
+    # Strip whitespace and handle postgres:// URLs
+    database_url = database_url.strip()
+    if not database_url:
+        print("Warning: DATABASE_URL is empty after stripping whitespace")
+        engine = None
+        Session = None
+    else:
+        # Convert postgres:// to postgresql:// (required for SQLAlchemy 2.0+)
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        try:
+            engine = create_engine(database_url, pool_pre_ping=True)
+            Base.metadata.create_all(engine)
+            Session = sessionmaker(bind=engine)
+            print("Database connection established successfully")
+        except Exception as e:
+            print(f"ERROR: Failed to create database engine: {e}")
+            print(f"Database URL (first 100 chars): {database_url[:100]}")
+            print("Application will start but database operations will fail.")
+            engine = None
+            Session = None
 else:
+    print("Warning: DATABASE_URL environment variable is not set")
     engine = None
     Session = None
 
