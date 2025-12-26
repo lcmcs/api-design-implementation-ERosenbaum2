@@ -76,7 +76,7 @@ def close_db(error):
 
 
 # Root endpoint (using Flask route to avoid Flask-RESTX conflicts)
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET'], endpoint='api_root')
 def root():
     """Root endpoint with API information."""
     return jsonify({
