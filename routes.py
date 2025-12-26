@@ -2,7 +2,7 @@
 API route handlers for the Minyan Finder API.
 """
 from flask import request, jsonify
-from flask_restx import Resource
+from flask_restx import Resource, fields
 from datetime import datetime
 from models import Broadcast
 from utils import calculate_distance, validate_coordinates, validate_minyan_type
@@ -11,8 +11,32 @@ from utils import calculate_distance, validate_coordinates, validate_minyan_type
 def register_routes(api, get_db_session_func):
     """Register all API routes."""
     
+    # Define models for Swagger documentation
+    broadcast_model = api.model('Broadcast', {
+        'latitude': fields.Float(required=True, description='Latitude (-90 to 90)'),
+        'longitude': fields.Float(required=True, description='Longitude (-180 to 180)'),
+        'minyanType': fields.String(required=True, description='Type of minyan: shacharit, mincha, or maariv', enum=['shacharit', 'mincha', 'maariv']),
+        'earliestTime': fields.String(required=True, description='Earliest time in ISO 8601 format (e.g., 2025-12-27T08:00:00Z)'),
+        'latestTime': fields.String(required=True, description='Latest time in ISO 8601 format (e.g., 2025-12-27T09:00:00Z)')
+    })
+    
+    broadcast_update_model = api.model('BroadcastUpdate', {
+        'latitude': fields.Float(required=False, description='Latitude (-90 to 90)'),
+        'longitude': fields.Float(required=False, description='Longitude (-180 to 180)'),
+        'earliestTime': fields.String(required=False, description='Earliest time in ISO 8601 format'),
+        'latestTime': fields.String(required=False, description='Latest time in ISO 8601 format')
+    })
+    
+    broadcast_response_model = api.model('BroadcastResponse', {
+        'id': fields.String(description='Broadcast ID'),
+        'message': fields.String(description='Success message')
+    })
+    
     @api.route('/broadcasts')
     class Broadcasts(Resource):
+        @api.expect(broadcast_model)
+        @api.marshal_with(broadcast_response_model, code=201)
+        @api.doc(description='Create a new broadcast when looking for a minyan')
         def post(self):
             """Create a new broadcast."""
             db_session = get_db_session_func()
@@ -69,6 +93,11 @@ def register_routes(api, get_db_session_func):
     
     @api.route('/broadcasts/nearby')
     class NearbyBroadcasts(Resource):
+        @api.param('latitude', 'Latitude of search location', required=True, type='float')
+        @api.param('longitude', 'Longitude of search location', required=True, type='float')
+        @api.param('radius', 'Search radius in miles', required=True, type='float')
+        @api.param('minyanType', 'Filter by minyan type (shacharit, mincha, maariv)', required=False, type='string')
+        @api.doc(description='Find nearby broadcasts within a specified radius')
         def get(self):
             """Find nearby broadcasts."""
             db_session = get_db_session_func()
@@ -125,6 +154,9 @@ def register_routes(api, get_db_session_func):
     
     @api.route('/broadcasts/<string:broadcast_id>')
     class BroadcastById(Resource):
+        @api.param('broadcast_id', 'The broadcast ID', required=True, type='string')
+        @api.expect(broadcast_update_model)
+        @api.doc(description='Update an existing broadcast')
         def put(self, broadcast_id):
             """Update a broadcast."""
             db_session = get_db_session_func()
@@ -175,6 +207,8 @@ def register_routes(api, get_db_session_func):
                 db_session.rollback()
                 return {'error': f'Failed to update broadcast: {str(e)}'}, 400
         
+        @api.param('broadcast_id', 'The broadcast ID', required=True, type='string')
+        @api.doc(description='Delete a broadcast')
         def delete(self, broadcast_id):
             """Delete a broadcast."""
             db_session = get_db_session_func()
