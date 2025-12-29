@@ -199,16 +199,32 @@ def register_routes(api, get_db_session_func):
                     return {'error': 'Broadcast not found'}, 404
                 
                 logger.info(f"[PUT /broadcasts/{broadcast_id}] Parsing request JSON...")
+                logger.info(f"[PUT /broadcasts/{broadcast_id}] Content-Type: {request.content_type}, Content-Length: {request.content_length}")
                 sys.stdout.flush()
                 json_start = time.time()
-                data = request.get_json()
+                
+                # Handle empty body or missing Content-Type
+                if request.content_length == 0 or not request.data:
+                    logger.info(f"[PUT /broadcasts/{broadcast_id}] Empty request body, using empty dict")
+                    data = {}
+                else:
+                    # Try to parse JSON, with force=True to allow missing Content-Type
+                    try:
+                        data = request.get_json(force=True) or {}
+                    except Exception as e:
+                        logger.error(f"[PUT /broadcasts/{broadcast_id}] Failed to parse JSON: {e}")
+                        # If JSON parsing fails, try to get raw data
+                        if request.data:
+                            try:
+                                import json
+                                data = json.loads(request.data.decode('utf-8'))
+                            except:
+                                data = {}
+                        else:
+                            data = {}
+                
                 logger.info(f"[PUT /broadcasts/{broadcast_id}] Request JSON parsed (took {time.time() - json_start:.2f}s), data: {data}")
                 sys.stdout.flush()
-                
-                if data is None:
-                    logger.warning(f"[PUT /broadcasts/{broadcast_id}] WARNING: request.get_json() returned None")
-                    sys.stdout.flush()
-                    data = {}
                 
                 # Update fields if provided
                 if 'latitude' in data or 'longitude' in data:
