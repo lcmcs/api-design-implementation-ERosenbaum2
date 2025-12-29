@@ -11,7 +11,7 @@ info:
 servers:
   - url: http://localhost:5000
     description: Local development server
-  - url: https://your-app.onrender.com
+  - url: https://minyan-finder-api.onrender.com
     description: Production server
 
 paths:
