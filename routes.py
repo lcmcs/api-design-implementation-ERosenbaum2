@@ -6,6 +6,7 @@ from flask_restx import Resource, fields, reqparse
 from datetime import datetime
 from models import Broadcast
 from utils import calculate_distance, validate_coordinates, validate_minyan_type
+import time
 
 
 def register_routes(api, get_db_session_func):
@@ -164,52 +165,87 @@ def register_routes(api, get_db_session_func):
         @api.doc(description='Update an existing broadcast')
         def put(self, broadcast_id):
             """Update a broadcast."""
-            db_session = get_db_session_func()
+            start_time = time.time()
+            print(f"[PUT /broadcasts/{broadcast_id}] Starting request at {time.strftime('%H:%M:%S')}")
+            
             try:
-                # Find broadcast
+                print(f"[PUT /broadcasts/{broadcast_id}] Getting database session...")
+                db_session = get_db_session_func()
+                print(f"[PUT /broadcasts/{broadcast_id}] Database session obtained (took {time.time() - start_time:.2f}s)")
+                
+                print(f"[PUT /broadcasts/{broadcast_id}] Querying for broadcast with id: {broadcast_id}")
+                query_start = time.time()
                 broadcast = db_session.query(Broadcast).filter(Broadcast.id == broadcast_id).first()
+                print(f"[PUT /broadcasts/{broadcast_id}] Query completed (took {time.time() - query_start:.2f}s)")
                 
                 if not broadcast:
+                    print(f"[PUT /broadcasts/{broadcast_id}] Broadcast not found")
                     return {'error': 'Broadcast not found'}, 404
                 
+                print(f"[PUT /broadcasts/{broadcast_id}] Parsing request JSON...")
+                json_start = time.time()
                 data = request.get_json()
+                print(f"[PUT /broadcasts/{broadcast_id}] Request JSON parsed (took {time.time() - json_start:.2f}s), data: {data}")
+                
+                if data is None:
+                    print(f"[PUT /broadcasts/{broadcast_id}] WARNING: request.get_json() returned None")
+                    data = {}
                 
                 # Update fields if provided
                 if 'latitude' in data or 'longitude' in data:
+                    print(f"[PUT /broadcasts/{broadcast_id}] Updating coordinates...")
                     new_lat = data.get('latitude', broadcast.latitude)
                     new_lon = data.get('longitude', broadcast.longitude)
                     
                     is_valid, error_msg = validate_coordinates(new_lat, new_lon)
                     if not is_valid:
+                        print(f"[PUT /broadcasts/{broadcast_id}] Invalid coordinates: {error_msg}")
                         return {'error': error_msg}, 400
                     
                     broadcast.latitude = new_lat
                     broadcast.longitude = new_lon
                 
                 if 'earliestTime' in data:
+                    print(f"[PUT /broadcasts/{broadcast_id}] Updating earliestTime...")
                     try:
                         earliest_time = datetime.fromisoformat(data['earliestTime'].replace('Z', '+00:00'))
                         broadcast.earliest_time = earliest_time
                     except (ValueError, AttributeError) as e:
+                        print(f"[PUT /broadcasts/{broadcast_id}] Invalid earliestTime format: {e}")
                         return {'error': f'Invalid earliestTime format: {str(e)}'}, 400
                 
                 if 'latestTime' in data:
+                    print(f"[PUT /broadcasts/{broadcast_id}] Updating latestTime...")
                     try:
                         latest_time = datetime.fromisoformat(data['latestTime'].replace('Z', '+00:00'))
                         broadcast.latest_time = latest_time
                     except (ValueError, AttributeError) as e:
+                        print(f"[PUT /broadcasts/{broadcast_id}] Invalid latestTime format: {e}")
                         return {'error': f'Invalid latestTime format: {str(e)}'}, 400
                 
                 # Validate time order
                 if broadcast.latest_time <= broadcast.earliest_time:
+                    print(f"[PUT /broadcasts/{broadcast_id}] Invalid time order")
                     return {'error': 'latestTime must be after earliestTime'}, 400
                 
+                print(f"[PUT /broadcasts/{broadcast_id}] Committing to database...")
+                commit_start = time.time()
                 db_session.commit()
+                print(f"[PUT /broadcasts/{broadcast_id}] Commit completed (took {time.time() - commit_start:.2f}s)")
                 
+                total_time = time.time() - start_time
+                print(f"[PUT /broadcasts/{broadcast_id}] Request completed successfully (total: {total_time:.2f}s)")
                 return {'message': 'Broadcast updated successfully'}, 200
                 
             except Exception as e:
-                db_session.rollback()
+                elapsed = time.time() - start_time
+                print(f"[PUT /broadcasts/{broadcast_id}] ERROR after {elapsed:.2f}s: {type(e).__name__}: {str(e)}")
+                import traceback
+                print(f"[PUT /broadcasts/{broadcast_id}] Traceback:\n{traceback.format_exc()}")
+                try:
+                    db_session.rollback()
+                except:
+                    pass
                 return {'error': f'Failed to update broadcast: {str(e)}'}, 400
         
         @api.param('broadcast_id', 'The broadcast ID', required=True, type='string')
