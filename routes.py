@@ -167,6 +167,12 @@ def register_routes(api, get_db_session_func):
         @api.param('broadcast_id', 'The broadcast ID', required=True, type='string')
         @api.expect(broadcast_update_model)
         @api.doc(description='Update an existing broadcast')
+        def options(self, broadcast_id):
+            """Handle CORS preflight for PUT requests."""
+            logger.info(f"[OPTIONS /broadcasts/{broadcast_id}] CORS preflight request")
+            sys.stdout.flush()
+            return {}, 200
+        
         def put(self, broadcast_id):
             """Update a broadcast."""
             start_time = time.time()

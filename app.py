@@ -18,7 +18,14 @@ load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+# Configure CORS to allow all methods including PUT
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 # Configure logging to ensure output is flushed immediately
 logging.basicConfig(
