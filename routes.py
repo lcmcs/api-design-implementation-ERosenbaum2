@@ -26,10 +26,10 @@ def register_routes(api, get_db_session_func):
     })
     
     broadcast_update_model = api.model('BroadcastUpdate', {
-        'latitude': fields.Float(required=False, description='Latitude (-90 to 90)'),
-        'longitude': fields.Float(required=False, description='Longitude (-180 to 180)'),
-        'earliestTime': fields.String(required=False, description='Earliest time in ISO 8601 format'),
-        'latestTime': fields.String(required=False, description='Latest time in ISO 8601 format')
+        'latitude': fields.Float(required=False, description='Latitude (-90 to 90)', example=40.7140),
+        'longitude': fields.Float(required=False, description='Longitude (-180 to 180)', example=-74.0065),
+        'earliestTime': fields.String(required=False, description='Earliest time in ISO 8601 format (e.g., 2025-03-26T13:00:00Z)', example='2025-03-26T13:00:00Z'),
+        'latestTime': fields.String(required=False, description='Latest time in ISO 8601 format (e.g., 2025-03-26T14:30:00Z)', example='2025-03-26T14:30:00Z')
     })
     
     broadcast_response_model = api.model('BroadcastResponse', {
@@ -162,17 +162,17 @@ def register_routes(api, get_db_session_func):
             except Exception as e:
                 return {'error': f'Failed to find nearby broadcasts: {str(e)}'}, 400
     
+    # Response model for update
+    update_response_model = api.model('UpdateResponse', {
+        'message': fields.String(description='Success message')
+    })
+    
     @api.route('/broadcasts/<string:broadcast_id>')
     class BroadcastById(Resource):
-        @api.param('broadcast_id', 'The broadcast ID', required=True, type='string')
+        @api.param('broadcast_id', 'The broadcast ID', required=True, type='string', _in='path')
         @api.expect(broadcast_update_model)
-        @api.doc(description='Update an existing broadcast')
-        def options(self, broadcast_id):
-            """Handle CORS preflight for PUT requests."""
-            logger.info(f"[OPTIONS /broadcasts/{broadcast_id}] CORS preflight request")
-            sys.stdout.flush()
-            return {}, 200
-        
+        @api.doc(description='Update an existing broadcast. All fields in the request body are optional.')
+        @api.marshal_with(update_response_model, code=200)
         def put(self, broadcast_id):
             """Update a broadcast."""
             start_time = time.time()
