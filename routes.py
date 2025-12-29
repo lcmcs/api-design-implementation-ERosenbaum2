@@ -7,6 +7,10 @@ from datetime import datetime
 from models import Broadcast
 from utils import calculate_distance, validate_coordinates, validate_minyan_type
 import time
+import sys
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def register_routes(api, get_db_session_func):
@@ -166,82 +170,102 @@ def register_routes(api, get_db_session_func):
         def put(self, broadcast_id):
             """Update a broadcast."""
             start_time = time.time()
-            print(f"[PUT /broadcasts/{broadcast_id}] Starting request at {time.strftime('%H:%M:%S')}")
+            logger.info(f"[PUT /broadcasts/{broadcast_id}] Starting request at {time.strftime('%H:%M:%S')}")
+            sys.stdout.flush()
             
             try:
-                print(f"[PUT /broadcasts/{broadcast_id}] Getting database session...")
+                logger.info(f"[PUT /broadcasts/{broadcast_id}] Getting database session...")
+                sys.stdout.flush()
                 db_session = get_db_session_func()
-                print(f"[PUT /broadcasts/{broadcast_id}] Database session obtained (took {time.time() - start_time:.2f}s)")
+                logger.info(f"[PUT /broadcasts/{broadcast_id}] Database session obtained (took {time.time() - start_time:.2f}s)")
+                sys.stdout.flush()
                 
-                print(f"[PUT /broadcasts/{broadcast_id}] Querying for broadcast with id: {broadcast_id}")
+                logger.info(f"[PUT /broadcasts/{broadcast_id}] Querying for broadcast with id: {broadcast_id}")
+                sys.stdout.flush()
                 query_start = time.time()
                 broadcast = db_session.query(Broadcast).filter(Broadcast.id == broadcast_id).first()
-                print(f"[PUT /broadcasts/{broadcast_id}] Query completed (took {time.time() - query_start:.2f}s)")
+                logger.info(f"[PUT /broadcasts/{broadcast_id}] Query completed (took {time.time() - query_start:.2f}s)")
+                sys.stdout.flush()
                 
                 if not broadcast:
-                    print(f"[PUT /broadcasts/{broadcast_id}] Broadcast not found")
+                    logger.warning(f"[PUT /broadcasts/{broadcast_id}] Broadcast not found")
+                    sys.stdout.flush()
                     return {'error': 'Broadcast not found'}, 404
                 
-                print(f"[PUT /broadcasts/{broadcast_id}] Parsing request JSON...")
+                logger.info(f"[PUT /broadcasts/{broadcast_id}] Parsing request JSON...")
+                sys.stdout.flush()
                 json_start = time.time()
                 data = request.get_json()
-                print(f"[PUT /broadcasts/{broadcast_id}] Request JSON parsed (took {time.time() - json_start:.2f}s), data: {data}")
+                logger.info(f"[PUT /broadcasts/{broadcast_id}] Request JSON parsed (took {time.time() - json_start:.2f}s), data: {data}")
+                sys.stdout.flush()
                 
                 if data is None:
-                    print(f"[PUT /broadcasts/{broadcast_id}] WARNING: request.get_json() returned None")
+                    logger.warning(f"[PUT /broadcasts/{broadcast_id}] WARNING: request.get_json() returned None")
+                    sys.stdout.flush()
                     data = {}
                 
                 # Update fields if provided
                 if 'latitude' in data or 'longitude' in data:
-                    print(f"[PUT /broadcasts/{broadcast_id}] Updating coordinates...")
+                    logger.info(f"[PUT /broadcasts/{broadcast_id}] Updating coordinates...")
+                    sys.stdout.flush()
                     new_lat = data.get('latitude', broadcast.latitude)
                     new_lon = data.get('longitude', broadcast.longitude)
                     
                     is_valid, error_msg = validate_coordinates(new_lat, new_lon)
                     if not is_valid:
-                        print(f"[PUT /broadcasts/{broadcast_id}] Invalid coordinates: {error_msg}")
+                        logger.error(f"[PUT /broadcasts/{broadcast_id}] Invalid coordinates: {error_msg}")
+                        sys.stdout.flush()
                         return {'error': error_msg}, 400
                     
                     broadcast.latitude = new_lat
                     broadcast.longitude = new_lon
                 
                 if 'earliestTime' in data:
-                    print(f"[PUT /broadcasts/{broadcast_id}] Updating earliestTime...")
+                    logger.info(f"[PUT /broadcasts/{broadcast_id}] Updating earliestTime...")
+                    sys.stdout.flush()
                     try:
                         earliest_time = datetime.fromisoformat(data['earliestTime'].replace('Z', '+00:00'))
                         broadcast.earliest_time = earliest_time
                     except (ValueError, AttributeError) as e:
-                        print(f"[PUT /broadcasts/{broadcast_id}] Invalid earliestTime format: {e}")
+                        logger.error(f"[PUT /broadcasts/{broadcast_id}] Invalid earliestTime format: {e}")
+                        sys.stdout.flush()
                         return {'error': f'Invalid earliestTime format: {str(e)}'}, 400
                 
                 if 'latestTime' in data:
-                    print(f"[PUT /broadcasts/{broadcast_id}] Updating latestTime...")
+                    logger.info(f"[PUT /broadcasts/{broadcast_id}] Updating latestTime...")
+                    sys.stdout.flush()
                     try:
                         latest_time = datetime.fromisoformat(data['latestTime'].replace('Z', '+00:00'))
                         broadcast.latest_time = latest_time
                     except (ValueError, AttributeError) as e:
-                        print(f"[PUT /broadcasts/{broadcast_id}] Invalid latestTime format: {e}")
+                        logger.error(f"[PUT /broadcasts/{broadcast_id}] Invalid latestTime format: {e}")
+                        sys.stdout.flush()
                         return {'error': f'Invalid latestTime format: {str(e)}'}, 400
                 
                 # Validate time order
                 if broadcast.latest_time <= broadcast.earliest_time:
-                    print(f"[PUT /broadcasts/{broadcast_id}] Invalid time order")
+                    logger.error(f"[PUT /broadcasts/{broadcast_id}] Invalid time order")
+                    sys.stdout.flush()
                     return {'error': 'latestTime must be after earliestTime'}, 400
                 
-                print(f"[PUT /broadcasts/{broadcast_id}] Committing to database...")
+                logger.info(f"[PUT /broadcasts/{broadcast_id}] Committing to database...")
+                sys.stdout.flush()
                 commit_start = time.time()
                 db_session.commit()
-                print(f"[PUT /broadcasts/{broadcast_id}] Commit completed (took {time.time() - commit_start:.2f}s)")
+                logger.info(f"[PUT /broadcasts/{broadcast_id}] Commit completed (took {time.time() - commit_start:.2f}s)")
+                sys.stdout.flush()
                 
                 total_time = time.time() - start_time
-                print(f"[PUT /broadcasts/{broadcast_id}] Request completed successfully (total: {total_time:.2f}s)")
+                logger.info(f"[PUT /broadcasts/{broadcast_id}] Request completed successfully (total: {total_time:.2f}s)")
+                sys.stdout.flush()
                 return {'message': 'Broadcast updated successfully'}, 200
                 
             except Exception as e:
                 elapsed = time.time() - start_time
-                print(f"[PUT /broadcasts/{broadcast_id}] ERROR after {elapsed:.2f}s: {type(e).__name__}: {str(e)}")
+                logger.error(f"[PUT /broadcasts/{broadcast_id}] ERROR after {elapsed:.2f}s: {type(e).__name__}: {str(e)}")
                 import traceback
-                print(f"[PUT /broadcasts/{broadcast_id}] Traceback:\n{traceback.format_exc()}")
+                logger.error(f"[PUT /broadcasts/{broadcast_id}] Traceback:\n{traceback.format_exc()}")
+                sys.stdout.flush()
                 try:
                     db_session.rollback()
                 except:

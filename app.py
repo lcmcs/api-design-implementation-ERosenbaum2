@@ -1,7 +1,7 @@
 """
 Main Flask application for the Minyan Finder API.
 """
-from flask import Flask, jsonify, g
+from flask import Flask, jsonify, g, request
 from flask_restx import Api, Resource
 from flask_cors import CORS
 from models import Base
@@ -10,6 +10,8 @@ from sqlalchemy import create_engine
 from routes import register_routes
 from dotenv import load_dotenv
 import os
+import sys
+import logging
 
 # Load environment variables
 load_dotenv()
@@ -17,6 +19,26 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
+
+# Configure logging to ensure output is flushed immediately
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout,
+    force=True
+)
+logger = logging.getLogger(__name__)
+
+# Log all incoming requests
+@app.before_request
+def log_request_info():
+    logger.info(f"=== INCOMING REQUEST ===")
+    logger.info(f"Method: {request.method}")
+    logger.info(f"Path: {request.path}")
+    logger.info(f"Remote Address: {request.remote_addr}")
+    logger.info(f"Content-Type: {request.content_type}")
+    logger.info(f"Content-Length: {request.content_length}")
+    sys.stdout.flush()
 
 # Register root endpoint BEFORE Flask-RESTX Api to ensure it takes precedence
 # Use unique endpoint name to avoid conflict with Flask-RESTX's "root" endpoint
