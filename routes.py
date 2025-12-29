@@ -2,7 +2,7 @@
 API route handlers for the Minyan Finder API.
 """
 from flask import request, jsonify
-from flask_restx import Resource, fields
+from flask_restx import Resource, fields, reqparse
 from datetime import datetime
 from models import Broadcast
 from utils import calculate_distance, validate_coordinates, validate_minyan_type
@@ -91,22 +91,27 @@ def register_routes(api, get_db_session_func):
                 db_session.rollback()
                 return {'error': f'Failed to create broadcast: {str(e)}'}, 400
     
+    # Define parser for nearby broadcasts query parameters
+    nearby_parser = reqparse.RequestParser()
+    nearby_parser.add_argument('latitude', type=float, required=True, help='Latitude of search location (-90 to 90)')
+    nearby_parser.add_argument('longitude', type=float, required=True, help='Longitude of search location (-180 to 180)')
+    nearby_parser.add_argument('radius', type=float, required=True, help='Search radius in miles')
+    nearby_parser.add_argument('minyanType', type=str, required=False, help='Filter by minyan type (shacharit, mincha, maariv)')
+    
     @api.route('/broadcasts/nearby')
     class NearbyBroadcasts(Resource):
-        @api.param('latitude', 'Latitude of search location', required=True, type='float')
-        @api.param('longitude', 'Longitude of search location', required=True, type='float')
-        @api.param('radius', 'Search radius in miles', required=True, type='float')
-        @api.param('minyanType', 'Filter by minyan type (shacharit, mincha, maariv)', required=False, type='string')
+        @api.expect(nearby_parser)
         @api.doc(description='Find nearby broadcasts within a specified radius')
         def get(self):
             """Find nearby broadcasts."""
             db_session = get_db_session_func()
             try:
-                # Get query parameters
-                latitude = request.args.get('latitude', type=float)
-                longitude = request.args.get('longitude', type=float)
-                radius = request.args.get('radius', type=float)
-                minyan_type = request.args.get('minyanType', type=str)
+                # Parse query parameters using reqparse
+                args = nearby_parser.parse_args()
+                latitude = args['latitude']
+                longitude = args['longitude']
+                radius = args['radius']
+                minyan_type = args.get('minyanType')
                 
                 # Validate required parameters
                 if latitude is None:
