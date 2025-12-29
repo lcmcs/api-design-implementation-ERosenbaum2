@@ -3,7 +3,7 @@ API route handlers for the Minyan Finder API.
 """
 from flask import request, jsonify
 from flask_restx import Resource, fields, reqparse
-from datetime import datetime
+from datetime import datetime, timezone
 from models import Broadcast
 from utils import calculate_distance, validate_coordinates, validate_minyan_type
 import time
@@ -68,6 +68,11 @@ def register_routes(api, get_db_session_func):
                 try:
                     earliest_time = datetime.fromisoformat(data['earliestTime'].replace('Z', '+00:00'))
                     latest_time = datetime.fromisoformat(data['latestTime'].replace('Z', '+00:00'))
+                    # Convert to naive UTC datetime for storage
+                    if earliest_time.tzinfo is not None:
+                        earliest_time = earliest_time.astimezone(timezone.utc).replace(tzinfo=None)
+                    if latest_time.tzinfo is not None:
+                        latest_time = latest_time.astimezone(timezone.utc).replace(tzinfo=None)
                 except (ValueError, AttributeError) as e:
                     return {'error': f'Invalid time format: {str(e)}'}, 400
                 
@@ -247,6 +252,9 @@ def register_routes(api, get_db_session_func):
                     sys.stdout.flush()
                     try:
                         earliest_time = datetime.fromisoformat(data['earliestTime'].replace('Z', '+00:00'))
+                        # Convert to naive UTC datetime for storage
+                        if earliest_time.tzinfo is not None:
+                            earliest_time = earliest_time.astimezone(timezone.utc).replace(tzinfo=None)
                         broadcast.earliest_time = earliest_time
                     except (ValueError, AttributeError) as e:
                         logger.error(f"[PUT /broadcasts/{broadcast_id}] Invalid earliestTime format: {e}")
@@ -258,15 +266,18 @@ def register_routes(api, get_db_session_func):
                     sys.stdout.flush()
                     try:
                         latest_time = datetime.fromisoformat(data['latestTime'].replace('Z', '+00:00'))
+                        # Convert to naive UTC datetime for storage
+                        if latest_time.tzinfo is not None:
+                            latest_time = latest_time.astimezone(timezone.utc).replace(tzinfo=None)
                         broadcast.latest_time = latest_time
                     except (ValueError, AttributeError) as e:
                         logger.error(f"[PUT /broadcasts/{broadcast_id}] Invalid latestTime format: {e}")
                         sys.stdout.flush()
                         return {'error': f'Invalid latestTime format: {str(e)}'}, 400
                 
-                # Validate time order
+                # Validate time order (both should now be naive UTC datetimes)
                 if broadcast.latest_time <= broadcast.earliest_time:
-                    logger.error(f"[PUT /broadcasts/{broadcast_id}] Invalid time order")
+                    logger.error(f"[PUT /broadcasts/{broadcast_id}] Invalid time order: latestTime ({broadcast.latest_time}) <= earliestTime ({broadcast.earliest_time})")
                     sys.stdout.flush()
                     return {'error': 'latestTime must be after earliestTime'}, 400
                 
