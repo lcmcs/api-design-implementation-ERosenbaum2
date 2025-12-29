@@ -35,10 +35,23 @@ def log_request_info():
     logger.info(f"=== INCOMING REQUEST ===")
     logger.info(f"Method: {request.method}")
     logger.info(f"Path: {request.path}")
+    logger.info(f"Full URL: {request.url}")
     logger.info(f"Remote Address: {request.remote_addr}")
     logger.info(f"Content-Type: {request.content_type}")
     logger.info(f"Content-Length: {request.content_length}")
+    logger.info(f"Headers: {dict(request.headers)}")
+    if request.method in ['POST', 'PUT', 'PATCH']:
+        logger.info(f"Request data preview (first 500 chars): {str(request.get_data())[:500]}")
     sys.stdout.flush()
+
+# Log after request to see if it completes
+@app.after_request
+def log_response_info(response):
+    logger.info(f"=== RESPONSE ===")
+    logger.info(f"Status: {response.status_code}")
+    logger.info(f"Path: {request.path}")
+    sys.stdout.flush()
+    return response
 
 # Register root endpoint BEFORE Flask-RESTX Api to ensure it takes precedence
 # Use unique endpoint name to avoid conflict with Flask-RESTX's "root" endpoint
@@ -128,6 +141,21 @@ class Health(Resource):
     def get(self):
         """Health check endpoint."""
         return {'status': 'healthy', 'service': 'minyan-finder-api'}, 200
+
+# Test endpoint to verify PUT requests work
+@app.route('/test-put', methods=['PUT', 'OPTIONS'])
+def test_put():
+    """Test endpoint to verify PUT requests are reaching the server."""
+    logger.info("TEST PUT ENDPOINT CALLED")
+    sys.stdout.flush()
+    if request.method == 'OPTIONS':
+        # Handle CORS preflight
+        response = jsonify({})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'PUT, OPTIONS')
+        return response, 200
+    return jsonify({'message': 'PUT request received successfully', 'data': request.get_json()}), 200
 
 
 @app.errorhandler(404)
