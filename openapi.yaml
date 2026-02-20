@@ -1,0 +1,365 @@
+openapi: 3.0.3
+info:
+  title: Minyan Finder API
+  description: |
+    A RESTful API for finding nearby people who need a minyan (prayer group).
+    Users can broadcast their location and search for others nearby who need the same type of minyan.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+  - url: https://minyan-finder-api.onrender.com
+    description: Production server
+
+paths:
+  /broadcasts:
+    post:
+      summary: Create a new broadcast
+      description: A user broadcasts that they are looking for a minyan at a specific location and time.
+      operationId: createBroadcast
+      tags:
+        - Broadcasts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBroadcastRequest'
+            examples:
+              mincha:
+                summary: Mincha broadcast example
+                value:
+                  latitude: 40.7128
+                  longitude: -74.0060
+                  minyanType: mincha
+                  earliestTime: "2025-03-26T13:00:00Z"
+                  latestTime: "2025-03-26T14:00:00Z"
+      responses:
+        '201':
+          description: Broadcast created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBroadcastResponse'
+              example:
+                id: "abc123-def456-ghi789"
+                message: "Broadcast created successfully"
+        '400':
+          description: Bad request - invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Invalid input: latitude must be between -90 and 90"
+
+  /broadcasts/nearby:
+    get:
+      summary: Find nearby broadcasts
+      description: Find people near you who need the same minyan. Returns broadcasts within the specified radius.
+      operationId: findNearbyBroadcasts
+      tags:
+        - Broadcasts
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          description: Latitude of the search location
+          schema:
+            type: number
+            format: float
+            minimum: -90
+            maximum: 90
+          example: 40.7130
+        - name: longitude
+          in: query
+          required: true
+          description: Longitude of the search location
+          schema:
+            type: number
+            format: float
+            minimum: -180
+            maximum: 180
+          example: -74.0059
+        - name: radius
+          in: query
+          required: true
+          description: Search radius in miles
+          schema:
+            type: number
+            format: float
+            minimum: 0
+          example: 2
+        - name: minyanType
+          in: query
+          required: false
+          description: Filter by minyan type (shacharit, mincha, maariv)
+          schema:
+            type: string
+            enum: [shacharit, mincha, maariv]
+          example: mincha
+      responses:
+        '200':
+          description: List of nearby broadcasts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Broadcast'
+              example:
+                - id: "abc123-def456-ghi789"
+                  latitude: 40.7128
+                  longitude: -74.0060
+                  minyanType: mincha
+                  earliestTime: "2025-03-26T13:00:00Z"
+                  latestTime: "2025-03-26T14:00:00Z"
+                  active: true
+                  createdAt: "2025-03-26T12:45:00Z"
+        '400':
+          description: Bad request - missing or invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Missing required parameter: latitude"
+
+  /broadcasts/{id}:
+    put:
+      summary: Update a broadcast
+      description: Update a broadcast's location or time window. Only provided fields will be updated.
+      operationId: updateBroadcast
+      tags:
+        - Broadcasts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Broadcast ID
+          schema:
+            type: string
+            format: uuid
+          example: "abc123-def456-ghi789"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBroadcastRequest'
+            example:
+              latitude: 40.7140
+              longitude: -74.0065
+              latestTime: "2025-03-26T14:30:00Z"
+      responses:
+        '200':
+          description: Broadcast updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateBroadcastResponse'
+              example:
+                message: "Broadcast updated successfully"
+        '404':
+          description: Broadcast not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Broadcast not found"
+        '400':
+          description: Bad request - invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete a broadcast
+      description: Remove a broadcast when the user is no longer looking for a minyan.
+      operationId: deleteBroadcast
+      tags:
+        - Broadcasts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Broadcast ID
+          schema:
+            type: string
+            format: uuid
+          example: "abc123-def456-ghi789"
+      responses:
+        '204':
+          description: Broadcast deleted successfully
+        '404':
+          description: Broadcast not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Broadcast not found"
+
+components:
+  schemas:
+    Broadcast:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the broadcast
+          example: "abc123-def456-ghi789"
+        latitude:
+          type: number
+          format: float
+          description: Latitude coordinate
+          example: 40.7128
+        longitude:
+          type: number
+          format: float
+          description: Longitude coordinate
+          example: -74.0060
+        minyanType:
+          type: string
+          enum: [shacharit, mincha, maariv]
+          description: Type of minyan needed
+          example: mincha
+        earliestTime:
+          type: string
+          format: date-time
+          description: Earliest time for the minyan (ISO 8601 UTC)
+          example: "2025-03-26T13:00:00Z"
+        latestTime:
+          type: string
+          format: date-time
+          description: Latest time for the minyan (ISO 8601 UTC)
+          example: "2025-03-26T14:00:00Z"
+        active:
+          type: boolean
+          description: Whether the broadcast is currently active
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: When the broadcast was created (ISO 8601 UTC)
+          example: "2025-03-26T12:45:00Z"
+      required:
+        - id
+        - latitude
+        - longitude
+        - minyanType
+        - earliestTime
+        - latestTime
+        - active
+        - createdAt
+
+    CreateBroadcastRequest:
+      type: object
+      properties:
+        latitude:
+          type: number
+          format: float
+          minimum: -90
+          maximum: 90
+          description: Latitude coordinate
+          example: 40.7128
+        longitude:
+          type: number
+          format: float
+          minimum: -180
+          maximum: 180
+          description: Longitude coordinate
+          example: -74.0060
+        minyanType:
+          type: string
+          enum: [shacharit, mincha, maariv]
+          description: Type of minyan needed
+          example: mincha
+        earliestTime:
+          type: string
+          format: date-time
+          description: Earliest time for the minyan (ISO 8601 UTC)
+          example: "2025-03-26T13:00:00Z"
+        latestTime:
+          type: string
+          format: date-time
+          description: Latest time for the minyan (ISO 8601 UTC)
+          example: "2025-03-26T14:00:00Z"
+      required:
+        - latitude
+        - longitude
+        - minyanType
+        - earliestTime
+        - latestTime
+
+    CreateBroadcastResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the created broadcast
+          example: "abc123-def456-ghi789"
+        message:
+          type: string
+          description: Success message
+          example: "Broadcast created successfully"
+      required:
+        - id
+        - message
+
+    UpdateBroadcastRequest:
+      type: object
+      properties:
+        latitude:
+          type: number
+          format: float
+          minimum: -90
+          maximum: 90
+          description: Updated latitude coordinate
+          example: 40.7140
+        longitude:
+          type: number
+          format: float
+          minimum: -180
+          maximum: 180
+          description: Updated longitude coordinate
+          example: -74.0065
+        earliestTime:
+          type: string
+          format: date-time
+          description: Updated earliest time for the minyan (ISO 8601 UTC)
+          example: "2025-03-26T13:00:00Z"
+        latestTime:
+          type: string
+          format: date-time
+          description: Updated latest time for the minyan (ISO 8601 UTC)
+          example: "2025-03-26T14:30:00Z"
+      description: All fields are optional - only provided fields will be updated
+
+    UpdateBroadcastResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Success message
+          example: "Broadcast updated successfully"
+      required:
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid input: latitude must be between -90 and 90"
+      required:
+        - error
+
